@@ -150,14 +150,14 @@ func main() {
 
 	tarBuffer.WriteTo(controlFile)
 
-	// find md5
-
-	// write md5
-
+	// find all data files
+	
 	// write data tarball
 
-	// generate output name
+	// write debian-binary (file)
 
-	// convert source into .deb
+	// TOOD: ar vs tar
+	// add 'debian-binary' + control.tar.gz + data.tar.gz via ar as a deb
+	// $ ar r package-version.deb debian-binary control.tar.gz ata.tar.gz
 
 }
