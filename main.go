@@ -15,7 +15,7 @@ type PackageMetaData struct {
 	MaintainerEmail string
 }
 
-const controlTemplate = `Package: {{.Name}}
+const controlTemplateText = `Package: {{.Name}}
 Version: {{.Version}}-1
 Section: base
 Priority: optional
@@ -24,6 +24,15 @@ Depends: bash (>= 2.05a-11)
 Maintainer: {{.Maintainer}} <{{.MaintainerEmail}}>
 Description: Built with debbie
 `
+
+const changelogTemplateText = `{{.name}} ({{.Version}}-1) unstable; urgent=medium
+
+  * Initial release
+
+-- {{.Maintianer}} <{{.MaintainerEmail}}> Mon, 22 Mar 2010 00:37:31 +0100
+`
+
+const compatTemplateText = `10`
 
 var strPackageName = flag.String("name", "", "name of package")
 var strPath = flag.String("path", "", "path to sources files")
@@ -44,15 +53,32 @@ func main() {
 		Maintainer: *strMaintainer,
 		MaintainerEmail: *strMaintainerEmail}
 
+	// debian directory
+	debianPathAbs := filepath.Join(*strPath, "debian")
+	os.Mkdir(debianPathAbs, 0644)
+		
 	// control file
-	// controlPathAbs := filepath.Join(*strPath, "control")
-	// perm0644 := os.FileMode(0644)
-	t := template.New("control")
-	t, _ = t.Parse(controlTemplate)
-	t.Execute(os.Stdout, metadata)
-
+	controlPathAbs := filepath.Join(debianPathAbs, "control")
+	println(controlPathAbs)
+	controlFile, _ := os.Create(controlPathAbs)
+	
+	controlTemplate := template.New("control")
+	controlTemplate, _ = controlTemplate.Parse(controlTemplateText)
+	controlTemplate.Execute(controlFile, metadata)
+	
 	// changelog
+	changelogPathAbs := filepath.Join(*strPath, "debian", "changelog")
+	changelogFile, _ := os.Create(changelogPathAbs)
 
+	changelogTemplate := template.New("changelog")
+	changelogTemplate, _ = changelogTemplate.Parse(changelogTemplateText)
+	changelogTemplate.Execute(changelogFile, metadata)	
+
+	//compant
+	compatTemplate := template.New("compat")
+	compatTemplate, _ = compatTemplate.Parse(compatTemplateText)
+	compatTemplate.Execute(os.Stdout, metadata)	
+	
 	// write control tarball
 
 	// find md5
