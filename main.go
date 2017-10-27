@@ -1,12 +1,14 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
 	"flag"
 	"log"
 	"text/template"
-	"os"
 	"path/filepath"
 	"path"
+	"os"
 )
 
 type PackageMetaData struct {
@@ -16,6 +18,12 @@ type PackageMetaData struct {
 	Maintainer string
 	MaintainerEmail string
 }
+
+type TarFiles struct {
+	Name string
+	Content bytes.Buffer
+}
+
 
 const controlTemplateText = `Package: {{.Name}}
 Version: {{.Version}}-1
@@ -62,39 +70,23 @@ func main() {
 		metadata.Name = sourcePathBase
 	}
 
-	// debian directory
-	debianPathAbs := filepath.Join(*strPath, "debian")
-	os.Mkdir(debianPathAbs, 0755)
-
 	// control file
-	controlPathAbs := filepath.Join(debianPathAbs, "control")
-	controlFile, err := os.Create(controlPathAbs)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	controlBuffer := new(bytes.Buffer)
 	controlTemplate := template.New("control")
-	controlTemplate, err = controlTemplate.Parse(controlTemplateText)
+	controlTemplate, err := controlTemplate.Parse(controlTemplateText)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = controlTemplate.Execute(controlFile, metadata)
+	err = controlTemplate.Execute(controlBuffer, metadata)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// changelog
-	changelogPathAbs := filepath.Join(debianPathAbs, "changelog")
-	changelogFile, err := os.Create(changelogPathAbs)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	changelogBuffer := new(bytes.Buffer)
 	changelogTemplate := template.New("changelog")
 	changelogTemplate, err = changelogTemplate.Parse(changelogTemplateText)
 
@@ -102,20 +94,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = changelogTemplate.Execute(changelogFile, metadata)
+	err = changelogTemplate.Execute(changelogBuffer, metadata)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	//compat
-	compatPathAbs := filepath.Join(debianPathAbs, "compat")
-	compatFile, err := os.Create(compatPathAbs)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	compatBuffer := new(bytes.Buffer)
 	compatTemplate := template.New("compat")
 	compatTemplate, err = compatTemplate.Parse(compatTemplateText)
 
@@ -123,13 +109,46 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = compatTemplate.Execute(compatFile, metadata)
+	err = compatTemplate.Execute(compatBuffer, metadata)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// write control tarball
+	controlPathAbs := filepath.Join(*strPath, "control.tar.gz")
+	controlFile, err := os.Create(controlPathAbs)
+	
+	tarBuffer := new(bytes.Buffer)
+	tarWriter := tar.NewWriter(tarBuffer)
+	controlFiles := [...]TarFiles{
+		TarFiles{"debian/control", *controlBuffer},
+		TarFiles{"debian/changelog", *changelogBuffer},
+		TarFiles{"debian/compat", *compatBuffer},
+	}
+
+	for _, file := range controlFiles {
+		tarHeader := &tar.Header{
+			Name: file.Name,
+			Mode: 600,
+			Size: int64(file.Content.Len()),
+		}
+		if err = tarWriter.WriteHeader(tarHeader); err != nil {
+			log.Fatal(err)
+		}
+
+		ContentBytes := make([]byte, file.Content.Len())
+		file.Content.Read(ContentBytes)
+		if _, err := tarWriter.Write(ContentBytes); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if err = tarWriter.Close(); err != nil {
+		log.Fatal(err)
+	}
+
+	tarBuffer.WriteTo(controlFile)
 
 	// find md5
 
