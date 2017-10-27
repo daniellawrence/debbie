@@ -2,9 +2,11 @@ package main
 
 import (
 	"flag"
+	"log"
 	"text/template"
 	"os"
 	"path/filepath"
+	"path"
 )
 
 type PackageMetaData struct {
@@ -25,14 +27,15 @@ Maintainer: {{.Maintainer}} <{{.MaintainerEmail}}>
 Description: Built with debbie
 `
 
-const changelogTemplateText = `{{.name}} ({{.Version}}-1) unstable; urgent=medium
+const changelogTemplateText = `{{.Name}} ({{.Version}}-1) unstable; urgent=medium
 
   * Initial release
 
--- {{.Maintianer}} <{{.MaintainerEmail}}> Mon, 22 Mar 2010 00:37:31 +0100
+-- {{.Maintainer}} <{{.MaintainerEmail}}> Mon, 22 Mar 2010 00:37:31 +0100
 `
 
-const compatTemplateText = `10`
+const compatTemplateText = `10
+`
 
 var strPackageName = flag.String("name", "", "name of package")
 var strPath = flag.String("path", "", "path to sources files")
@@ -45,45 +48,94 @@ func main() {
 	flag.Parse()
 
 	sourcePathAbs, _ := filepath.Abs(*strPath)
-	
-	
-	metadata := PackageMetaData{Name: *strPackageName,
+	sourcePathBase := path.Base(sourcePathAbs)
+
+	metadata := PackageMetaData{
+		Name: *strPackageName,
 		SourcePath: sourcePathAbs,
 		Version: *strVersion,
 		Maintainer: *strMaintainer,
 		MaintainerEmail: *strMaintainerEmail}
 
+	
+	if *strPackageName == "" {
+		metadata.Name = sourcePathBase
+	}
+
 	// debian directory
 	debianPathAbs := filepath.Join(*strPath, "debian")
-	os.Mkdir(debianPathAbs, 0644)
-		
+	os.Mkdir(debianPathAbs, 0755)
+
 	// control file
 	controlPathAbs := filepath.Join(debianPathAbs, "control")
-	println(controlPathAbs)
-	controlFile, _ := os.Create(controlPathAbs)
-	
+	controlFile, err := os.Create(controlPathAbs)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	controlTemplate := template.New("control")
-	controlTemplate, _ = controlTemplate.Parse(controlTemplateText)
-	controlTemplate.Execute(controlFile, metadata)
-	
+	controlTemplate, err = controlTemplate.Parse(controlTemplateText)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = controlTemplate.Execute(controlFile, metadata)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// changelog
-	changelogPathAbs := filepath.Join(*strPath, "debian", "changelog")
-	changelogFile, _ := os.Create(changelogPathAbs)
+	changelogPathAbs := filepath.Join(debianPathAbs, "changelog")
+	changelogFile, err := os.Create(changelogPathAbs)
+
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	changelogTemplate := template.New("changelog")
-	changelogTemplate, _ = changelogTemplate.Parse(changelogTemplateText)
-	changelogTemplate.Execute(changelogFile, metadata)	
+	changelogTemplate, err = changelogTemplate.Parse(changelogTemplateText)
 
-	//compant
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = changelogTemplate.Execute(changelogFile, metadata)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//compat
+	compatPathAbs := filepath.Join(debianPathAbs, "compat")
+	compatFile, err := os.Create(compatPathAbs)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	compatTemplate := template.New("compat")
-	compatTemplate, _ = compatTemplate.Parse(compatTemplateText)
-	compatTemplate.Execute(os.Stdout, metadata)	
-	
+	compatTemplate, err = compatTemplate.Parse(compatTemplateText)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = compatTemplate.Execute(compatFile, metadata)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// write control tarball
 
 	// find md5
 
 	// write md5
+
+	// write data tarball
 
 	// generate output name
 
