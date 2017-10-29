@@ -3,6 +3,8 @@ package main
 import (
 	"archive/tar"
 	"bytes"
+	"compress/gzip"
+	"crypto/md5"
 	"flag"
 	"fmt"
 	"log"
@@ -10,30 +12,39 @@ import (
 	"path/filepath"
 	"path"
 	"os"
+	"time"
+	"io/ioutil"
 	//
 	"github.com/blakesmith/ar"
 )
 
 type PackageMetaData struct {
-	Name string
-	SourcePath string
-	Version string
-	Maintainer string
+	Name            string
+	DebFile         string
+	SourcePath      string
+	SourcePathBase  string
+	Version         string
+	Maintainer      string
 	MaintainerEmail string
+	InstallSize     int64
+	Time            time.Time
 }
 
 type TarFiles struct {
-	Name string
-	Mode uint32
+	Name    string
+	Mode    uint32
+	Size    int64
 	Content bytes.Buffer
+	Md5Sum  []byte
 }
 
-const controlTemplateText = `Package: {{.Name}}
+const controlTemplateText = `
+Package: {{.Name}}
 Version: {{.Version}}-1
-Section: base
+Section: devel
 Priority: optional
 Architecture: all
-Depends: bash (>= 2.05a-11)
+Install-Size: {.InstallSize}}
 Maintainer: {{.Maintainer}} <{{.MaintainerEmail}}>
 Description: Built with debbie
 `
@@ -55,6 +66,89 @@ var strMaintainer = flag.String("maintainer", "Dainel Lawrence", "maintainer")
 var strMaintainerEmail = flag.String("maintainer-email", "dannyla@linux.com", "maintainer email")
 
 
+func createDeb(metadata PackageMetaData) error {
+	debFileName := fmt.Sprintf("/tmp/%s_%s_all.deb", metadata.Name, metadata.Version)
+	debFile, _ := os.Create(debFileName)
+	defer debFile.Close()
+
+	// tarBuffer := new(bytes.Buffer)
+	// gzBuffer := gzip.NewWriter(tarBuffer)
+	// tarWriter := tar.NewWriter(gzBuffer)
+	// print(tarWriter)
+
+	// find all data files
+	var ignoreDirs = []string{".bzr", ".hg", ".git"}
+	var DataFiles = []TarFiles{}
+	filepath.Walk(metadata.SourcePath, populateDataFiles(ignoreDirs, &DataFiles))
+
+	for _, file := range DataFiles {
+		print(file.Name)
+		print("\n")
+	}
+
+	return nil
+}
+
+
+func createControl(metadata PackageMetaData, md5sums []byte) (controllTarGz []byte, err error) {
+	tarBuffer := new(bytes.Buffer)
+	gzBuffer := gzip.NewWriter(tarBuffer)
+	tarWriter := tar.NewWriter(gzBuffer)
+
+	// control file
+	controlBuffer := new(bytes.Buffer)
+	controlTemplate := template.New("control")
+	controlTemplate, err = controlTemplate.Parse(controlTemplateText)
+	controlTemplate.Execute(controlBuffer, metadata)
+
+	hdr := tar.Header{
+		Name:     "control",
+		Size:     int64(controlBuffer.Len()),
+		Mode:     0644,
+		ModTime:  time.Now(),
+		Typeflag: tar.TypeReg,
+	}
+
+	err = tarWriter.WriteHeader(&hdr)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to write control to control.tar.gz: %v", err)
+	}
+	_, err = tarWriter.Write(controlBuffer.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("Failed to write control of control.tar.gz: %v", err)
+	}
+
+	// md5sums
+	hdr = tar.Header{
+		Name:     "md5sums",
+		Size:     int64(len(md5sums)),
+		Mode:     0644,
+		ModTime:  time.Now(),
+		Typeflag: tar.TypeReg,
+	}
+
+	err = tarWriter.WriteHeader(&hdr)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to write md5sums to control.tar.gz: %v", err)
+	}
+	_, err = tarWriter.Write(md5sums)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to write md5sums of control.tar.gz: %v", err)
+	}
+
+	err = tarWriter.Close()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to close control.tar.gz: %v", err)
+	}
+
+	err = gzBuffer.Close()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to close control.tar.gz: %v", err)
+	}
+
+	return tarBuffer.Bytes(), nil
+}
+
 func main() {
 	flag.Parse()
 
@@ -64,104 +158,23 @@ func main() {
 	metadata := PackageMetaData{
 		Name: *strPackageName,
 		SourcePath: sourcePathAbs,
+		SourcePathBase: sourcePathBase,
 		Version: *strVersion,
 		Maintainer: *strMaintainer,
-		MaintainerEmail: *strMaintainerEmail}
-
+		MaintainerEmail: *strMaintainerEmail,
+		Time: time.Now()}
 	
 	if *strPackageName == "" {
 		metadata.Name = sourcePathBase
 	}
 
-	// control file
-	controlBuffer := new(bytes.Buffer)
-	controlTemplate := template.New("control")
-	controlTemplate, err := controlTemplate.Parse(controlTemplateText)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = controlTemplate.Execute(controlBuffer, metadata)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// changelog
-	changelogBuffer := new(bytes.Buffer)
-	changelogTemplate := template.New("changelog")
-	changelogTemplate, err = changelogTemplate.Parse(changelogTemplateText)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = changelogTemplate.Execute(changelogBuffer, metadata)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	//compat
-	compatBuffer := new(bytes.Buffer)
-	compatTemplate := template.New("compat")
-	compatTemplate, err = compatTemplate.Parse(compatTemplateText)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = compatTemplate.Execute(compatBuffer, metadata)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// write control tarball
-	controlPathAbs := filepath.Join(*strPath, "control.tar.gz")
-	controlFile, err := os.Create(controlPathAbs)
+	createDeb(metadata)
 	
-	tarBuffer := new(bytes.Buffer)
-	tarWriter := tar.NewWriter(tarBuffer)
-	controlFiles := [...]TarFiles{
-		TarFiles{"debian/control", 0600, *controlBuffer},
-		TarFiles{"debian/changelog", 0600, *changelogBuffer},
-		TarFiles{"debian/compat", 0600, *compatBuffer},
-	}
-
-	for _, file := range controlFiles {
-		tarHeader := &tar.Header{
-			Name: file.Name,
-			Mode: int64(file.Mode),
-			Size: int64(file.Content.Len()),
-		}
-		if err = tarWriter.WriteHeader(tarHeader); err != nil {
-			log.Fatal(err)
-		}
-
-		ContentBytes := make([]byte, file.Content.Len())
-		file.Content.Read(ContentBytes)
-		if _, err := tarWriter.Write(ContentBytes); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	if err = tarWriter.Close(); err != nil {
-		log.Fatal(err)
-	}
-
-	tarBuffer.WriteTo(controlFile)
-
-	// find all data files
-	var ignoreDirs = []string{".bzr", ".hg", ".git"}
-	var DataFiles = []TarFiles{}
-
 	arBuffer := new(bytes.Buffer)
 	arWriter := ar.NewWriter(arBuffer)
+	log.Fatal(arWriter)
 	
 	
-	filepath.Walk(sourcePathAbs, populateDataFiles(ignoreDirs, &DataFiles))
 	
 	// write data arball
 
@@ -190,11 +203,12 @@ func populateDataFiles(ignoreDirs []string, dataFiles *[]TarFiles) filepath.Walk
 			}
 		}
 		mode := uint32(info.Mode())
-		// ContentBytes := make([]byte, file.Content.Len())
-		// file.Content.Read(ContentBytes)
-		// fileContent = 
-		*dataFiles = append(*dataFiles, TarFiles{path, mode, *new(bytes.Buffer)})
-		fmt.Println(path)
+		size := info.Size()
+		fileContent, err := ioutil.ReadFile(path)
+		fileBuffer := bytes.NewBuffer(fileContent)
+		md5Sum := md5.New().Sum(fileContent)
+		
+		*dataFiles = append(*dataFiles, TarFiles{path, mode, size, *fileBuffer, md5Sum})
 		return nil
     }
 }
