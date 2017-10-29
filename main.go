@@ -4,11 +4,14 @@ import (
 	"archive/tar"
 	"bytes"
 	"flag"
+	"fmt"
 	"log"
 	"text/template"
 	"path/filepath"
 	"path"
 	"os"
+	//
+	"github.com/blakesmith/ar"
 )
 
 type PackageMetaData struct {
@@ -21,9 +24,9 @@ type PackageMetaData struct {
 
 type TarFiles struct {
 	Name string
+	Mode uint32
 	Content bytes.Buffer
 }
-
 
 const controlTemplateText = `Package: {{.Name}}
 Version: {{.Version}}-1
@@ -122,15 +125,15 @@ func main() {
 	tarBuffer := new(bytes.Buffer)
 	tarWriter := tar.NewWriter(tarBuffer)
 	controlFiles := [...]TarFiles{
-		TarFiles{"debian/control", *controlBuffer},
-		TarFiles{"debian/changelog", *changelogBuffer},
-		TarFiles{"debian/compat", *compatBuffer},
+		TarFiles{"debian/control", 0600, *controlBuffer},
+		TarFiles{"debian/changelog", 0600, *changelogBuffer},
+		TarFiles{"debian/compat", 0600, *compatBuffer},
 	}
 
 	for _, file := range controlFiles {
 		tarHeader := &tar.Header{
 			Name: file.Name,
-			Mode: 600,
+			Mode: int64(file.Mode),
 			Size: int64(file.Content.Len()),
 		}
 		if err = tarWriter.WriteHeader(tarHeader); err != nil {
@@ -151,13 +154,48 @@ func main() {
 	tarBuffer.WriteTo(controlFile)
 
 	// find all data files
+	var ignoreDirs = []string{".bzr", ".hg", ".git"}
+	var DataFiles = []TarFiles{}
+
+	arBuffer := new(bytes.Buffer)
+	arWriter := ar.NewWriter(arBuffer)
 	
-	// write data tarball
+	
+	filepath.Walk(sourcePathAbs, populateDataFiles(ignoreDirs, &DataFiles))
+	
+	// write data arball
 
 	// write debian-binary (file)
 
-	// TOOD: ar vs tar
+	// TOOD: ar
 	// add 'debian-binary' + control.tar.gz + data.tar.gz via ar as a deb
 	// $ ar r package-version.deb debian-binary control.tar.gz ata.tar.gz
-
+	// I really dont want to shell out to running ar...
+	// but I dont to rewrite ar in go either.
+	// https://github.com/blakesmith/ar might be the way to go here.
 }
+
+func populateDataFiles(ignoreDirs []string, dataFiles *[]TarFiles) filepath.WalkFunc {
+	return func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Print(err)
+			return nil
+		}
+		if info.IsDir() {
+			dir := filepath.Base(path)
+			for _, d := range ignoreDirs {
+				if d == dir {
+					return filepath.SkipDir
+				}
+			}
+		}
+		mode := uint32(info.Mode())
+		// ContentBytes := make([]byte, file.Content.Len())
+		// file.Content.Read(ContentBytes)
+		// fileContent = 
+		*dataFiles = append(*dataFiles, TarFiles{path, mode, *new(bytes.Buffer)})
+		fmt.Println(path)
+		return nil
+    }
+}
+
