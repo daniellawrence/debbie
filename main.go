@@ -14,6 +14,7 @@ import (
 	"os"
 	"time"
 	"io/ioutil"
+	"strings"
 	//
 	"github.com/blakesmith/ar"
 )
@@ -23,6 +24,8 @@ type PackageMetaData struct {
 	DebFile         string
 	SourcePath      string
 	SourcePathBase  string
+	InstallPath     string
+	OutputDir       string
 	Version         string
 	Maintainer      string
 	MaintainerEmail string
@@ -62,14 +65,17 @@ const compatTemplateText = `10
 
 var strPackageName = flag.String("name", "", "name of package")
 var strPath = flag.String("path", "", "path to sources files")
+var strInstallPath = flag.String("install-path", "", "installPath (eg. /usr/local/<name>)")
+var strOutputDir = flag.String("output-dir", "/tmp/", "directory where the .deb file will be written")
 var strVersion = flag.String("version", "0.0.1", "version of page")
 var strMaintainer = flag.String("maintainer", "Dainel Lawrence", "maintainer")
 var strMaintainerEmail = flag.String("maintainer-email", "dannyla@linux.com", "maintainer email")
 
 
-func createDeb(metadata PackageMetaData) {
-	debFileName := fmt.Sprintf("/tmp/%s_%s_all.deb", metadata.Name, metadata.Version)
-	debFile, _ := os.Create(debFileName)
+func createDeb(metadata PackageMetaData) string {
+	debFileName := fmt.Sprintf("%s_%s_all.deb", metadata.Name, metadata.Version)
+	debFilePath := filepath.Join(metadata.OutputDir, debFileName)
+	debFile, _ := os.Create(debFilePath)
 	defer debFile.Close()
 
 	// The debFile is an AR file.
@@ -91,7 +97,7 @@ func createDeb(metadata PackageMetaData) {
 	var DataFiles = []TarFiles{}
 	var md5sums = new(bytes.Buffer)
 
-	filepath.Walk(metadata.SourcePath, populateDataFiles(ignoreDirs, &DataFiles))
+	filepath.Walk(metadata.SourcePath, populateDataFiles(ignoreDirs, &DataFiles, metadata))
 
 	for _, file := range DataFiles {
 
@@ -173,7 +179,7 @@ func createDeb(metadata PackageMetaData) {
 
 	// data.tar.gz
 	hdr = ar.Header{
-		Name: "control.tar.gz",
+		Name: "data.tar.gz",
 		Size: int64(len(tarBuffer.Bytes())),
 		Mode: 0644,
 	}
@@ -187,6 +193,8 @@ func createDeb(metadata PackageMetaData) {
 	if err != nil {
 		log.Fatalf("cannot write file header: %v", err)
 	}
+
+	return debFilePath
 
 }
 
@@ -260,6 +268,8 @@ func main() {
 		Name: *strPackageName,
 		SourcePath: sourcePathAbs,
 		SourcePathBase: sourcePathBase,
+		InstallPath: *strInstallPath,
+		OutputDir: *strOutputDir,
 		Version: *strVersion,
 		Maintainer: *strMaintainer,
 		MaintainerEmail: *strMaintainerEmail,
@@ -269,25 +279,17 @@ func main() {
 		metadata.Name = sourcePathBase
 	}
 
-	createDeb(metadata)
-
-
-
-
-	// write data arball
-
-	// write debian-binary (file)
-
-	// TOOD: ar
-	// add 'debian-binary' + control.tar.gz + data.tar.gz via ar as a deb
-	// $ ar r package-version.deb debian-binary control.tar.gz ata.tar.gz
-	// I really dont want to shell out to running ar...
-	// but I dont to rewrite ar in go either.
-	// https://github.com/blakesmith/ar might be the way to go here.
+	outputFile := createDeb(metadata)
+	log.Printf("Created file: %s\n", outputFile)
 }
 
-func populateDataFiles(ignoreDirs []string, dataFiles *[]TarFiles) filepath.WalkFunc {
+
+func populateDataFiles(ignoreDirs []string, dataFiles *[]TarFiles, metadata PackageMetaData) filepath.WalkFunc {
 	return func(path string, info os.FileInfo, err error) error {
+		// sourcePathLength := len(metadata.SourcePath)
+		relPath := strings.TrimPrefix(path, metadata.SourcePath)
+		targetPath := filepath.Join(metadata.InstallPath, relPath)		
+		
 		if err != nil {
 			log.Print(err)
 			return nil
@@ -308,7 +310,7 @@ func populateDataFiles(ignoreDirs []string, dataFiles *[]TarFiles) filepath.Walk
 		fileBuffer := bytes.NewBuffer(fileContent)
 		md5Sum := md5.New().Sum(fileContent)
 
-		*dataFiles = append(*dataFiles, TarFiles{path, mode, size, byte(fileType), *fileBuffer, md5Sum})
+		*dataFiles = append(*dataFiles, TarFiles{targetPath, mode, size, byte(fileType), *fileBuffer, md5Sum})
 		return nil
     }
 }

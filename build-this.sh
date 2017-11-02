@@ -1,6 +1,5 @@
-#!/bin/bash
+#!/bin/bash -e
 go build main.go
-mkdir -p build
-mv main build/debbie
-./build/debbie -name debbie -path ./build
-dpkg-deb --info /tmp/debbie*deb
+mkdir -p build/usr/local/bin/
+mv main build/usr/local/bin/debbie
+go run main.go -name debbie -path ./build
