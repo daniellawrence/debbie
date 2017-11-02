@@ -1,24 +1,30 @@
 debbie
 --------
 
-Goal: CLI that will convert a directory into a debian package.
+Create a .deb package for debian from a path.
 
-How to
---------
+Goals
+------
 
-accept defaults
+* Deb (*dead*) simple to use
+* Pure go, Do not shell out for any reason
+* Buffers over temp files, do not use any temp files written to the disk
+* Learn, Gain a better understanding of golang + deb packages
+* Fast, Be the fastest way to make a deb package on the internet
 
-```shell
-$ debbie -name python36 -path ./python363
-debian36-0.0.1-1.all.deb created
-```
+How to package
+-----------------
 
-Should you use this
------------------------
+The following command should create a package with a single file.
 
-no
+    $ mkdir -p /tmp/data/example/
+	$ date > /tmp/data/example/date.text
+	$ debbie -name example -path /tmp/data
+	example_0.0.1-1.deb
+	
+It should be installable via dpkg
 
-Should you raise issues and let me know how to use GO better
--------------------------------
+How to help
+--------------
 
-yes
+Let me know I am crazy

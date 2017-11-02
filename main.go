@@ -34,6 +34,7 @@ type TarFiles struct {
 	Name    string
 	Mode    uint32
 	Size    int64
+	Type    byte
 	Content bytes.Buffer
 	Md5Sum  []byte
 }
@@ -66,27 +67,68 @@ var strMaintainer = flag.String("maintainer", "Dainel Lawrence", "maintainer")
 var strMaintainerEmail = flag.String("maintainer-email", "dannyla@linux.com", "maintainer email")
 
 
-func createDeb(metadata PackageMetaData) error {
+func createDeb(metadata PackageMetaData) (dataFileTarGz []byte, err error) {
 	debFileName := fmt.Sprintf("/tmp/%s_%s_all.deb", metadata.Name, metadata.Version)
 	debFile, _ := os.Create(debFileName)
 	defer debFile.Close()
 
-	// tarBuffer := new(bytes.Buffer)
-	// gzBuffer := gzip.NewWriter(tarBuffer)
-	// tarWriter := tar.NewWriter(gzBuffer)
-	// print(tarWriter)
+	tarBuffer := new(bytes.Buffer)
+	gzBuffer := gzip.NewWriter(tarBuffer)
+	tarWriter := tar.NewWriter(gzBuffer)
 
 	// find all data files
+	var totalSize int64;
 	var ignoreDirs = []string{".bzr", ".hg", ".git"}
 	var DataFiles = []TarFiles{}
+	var md5sums = new(bytes.Buffer)
+
 	filepath.Walk(metadata.SourcePath, populateDataFiles(ignoreDirs, &DataFiles))
 
 	for _, file := range DataFiles {
-		print(file.Name)
-		print("\n")
+
+		if uint32(file.Type) != uint32(tar.TypeReg) {
+			continue
+		}
+
+		totalSize += file.Size
+		hdr := tar.Header{
+			Name:     file.Name,
+			Size:     file.Size,
+			ModTime:  time.Now(),
+			Mode:     0644,
+			Typeflag: file.Type,
+		}
+		md5sums.WriteString(fmt.Sprintf("%s  %s", file.Md5Sum, file.Name))
+
+		err := tarWriter.WriteHeader(&hdr)
+		if err != nil {
+			log.Fatalf("Writing datafile.tar.gz Header error: %v", err)
+		}
+
+		_, err = tarWriter.Write(file.Content.Bytes())
+		if err != nil {
+			log.Fatalf("Writing datafile.tar.gz Content error: %v", err)
+		}
 	}
 
-	return nil
+	metadata.InstallSize = totalSize
+
+	err = tarWriter.Close()
+	if err != nil {
+		log.Fatalf("Failed to close control.tar.gz: %v", err)
+	}
+
+	err = gzBuffer.Close()
+	if err != nil {
+		log.Fatalf("Failed to close control.tar.gz: %v", err)
+	}
+
+	_, err = createControl(metadata, md5sums.Bytes())
+	if err != nil {
+		log.Fatalf("CreateControl failed: %v", err)
+	}
+
+	return tarBuffer.Bytes(), nil
 }
 
 
@@ -163,19 +205,19 @@ func main() {
 		Maintainer: *strMaintainer,
 		MaintainerEmail: *strMaintainerEmail,
 		Time: time.Now()}
-	
+
 	if *strPackageName == "" {
 		metadata.Name = sourcePathBase
 	}
 
 	createDeb(metadata)
-	
+
 	arBuffer := new(bytes.Buffer)
 	arWriter := ar.NewWriter(arBuffer)
 	log.Fatal(arWriter)
-	
-	
-	
+
+
+
 	// write data arball
 
 	// write debian-binary (file)
@@ -194,7 +236,9 @@ func populateDataFiles(ignoreDirs []string, dataFiles *[]TarFiles) filepath.Walk
 			log.Print(err)
 			return nil
 		}
+		var fileType = tar.TypeReg
 		if info.IsDir() {
+			fileType = tar.TypeDir
 			dir := filepath.Base(path)
 			for _, d := range ignoreDirs {
 				if d == dir {
@@ -207,9 +251,8 @@ func populateDataFiles(ignoreDirs []string, dataFiles *[]TarFiles) filepath.Walk
 		fileContent, err := ioutil.ReadFile(path)
 		fileBuffer := bytes.NewBuffer(fileContent)
 		md5Sum := md5.New().Sum(fileContent)
-		
-		*dataFiles = append(*dataFiles, TarFiles{path, mode, size, *fileBuffer, md5Sum})
+
+		*dataFiles = append(*dataFiles, TarFiles{path, mode, size, byte(fileType), *fileBuffer, md5Sum})
 		return nil
     }
 }
-
