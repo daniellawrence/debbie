@@ -133,12 +133,62 @@ func createDeb(metadata PackageMetaData) {
 		log.Fatalf("Failed to close control.tar.gz: %v", err)
 	}
 
-	_, err = createControl(metadata, md5sums.Bytes())
+	controlTarGz, err := createControl(metadata, md5sums.Bytes())
 	if err != nil {
 		log.Fatalf("CreateControl failed: %v", err)
 	}
 
-	return tarBuffer.Bytes(), nil
+	// debian-binary
+	hdr := ar.Header{
+		Name: "debian-binary",
+		Size: 4,
+		Mode: 0644,
+	}
+
+	err = arWriter.WriteHeader(&hdr)
+	if err != nil {
+		log.Fatalf("cannot write file header: %v", err)
+	}
+
+	_, err = arWriter.Write([]byte("2.0\n"))
+	if err != nil {
+		log.Fatalf("cannot write file header: %v", err)
+	}
+
+	// control.tar.gz
+	hdr = ar.Header{
+		Name: "control.tar.gz",
+		Size: int64(len(controlTarGz)),
+		Mode: 0644,
+	}
+
+	err = arWriter.WriteHeader(&hdr)
+	if err != nil {
+		log.Fatalf("cannot write file header: %v", err)
+	}
+
+	_, err = arWriter.Write(controlTarGz)
+	if err != nil {
+		log.Fatalf("cannot write file header: %v", err)
+	}
+
+	// data.tar.gz
+	hdr = ar.Header{
+		Name: "control.tar.gz",
+		Size: int64(len(tarBuffer.Bytes())),
+		Mode: 0644,
+	}
+
+	err = arWriter.WriteHeader(&hdr)
+	if err != nil {
+		log.Fatalf("cannot write file header: %v", err)
+	}
+
+	_, err = arWriter.Write(tarBuffer.Bytes())
+	if err != nil {
+		log.Fatalf("cannot write file header: %v", err)
+	}
+
 }
 
 
@@ -222,9 +272,6 @@ func main() {
 
 	createDeb(metadata)
 
-	arBuffer := new(bytes.Buffer)
-	arWriter := ar.NewWriter(arBuffer)
-	log.Fatal(arWriter)
 
 
 
