@@ -44,9 +44,41 @@ Custom Maintainer
 
 Custom Maintainer Email
 
-    debbie -name nginx -path output -maintainer-email "Daniel Lawrence"
+    debbie -name nginx -path output -maintainer-email "dannyla@linux.com"
+
+Custom Description
+
+    debbie -name nginx -path output -description "dir2deb in go"
 
 
+Goal review
+--------------
+
+*dead simple to use*
+
+* Single file
+* Can be installed via apt/dpkg
+* No ruby/rbenv/pip/python/virtualenv
+
+*Pure go*
+
+No shells
+	 
+*Buffers over temp files*
+
+No Temp files
+	 
+*Learn*
+
+Its getting better
+	 
+*Fast*
+
+single file 2Mb package created in 340ms
+
+     $ time build/usr/local/bin/debbie -name debbie -path ./build
+     2017/11/01 22:13:26 Created file: /tmp/debbie_0.0.1_all.deb
+     build/usr/local/bin/debbie -name debbie -path ./build  0.34s user 0.00s system 100% cpu 0.342 total
 
 Example package (this)
 -----------------
