@@ -67,11 +67,21 @@ var strMaintainer = flag.String("maintainer", "Dainel Lawrence", "maintainer")
 var strMaintainerEmail = flag.String("maintainer-email", "dannyla@linux.com", "maintainer email")
 
 
-func createDeb(metadata PackageMetaData) (dataFileTarGz []byte, err error) {
+func createDeb(metadata PackageMetaData) {
 	debFileName := fmt.Sprintf("/tmp/%s_%s_all.deb", metadata.Name, metadata.Version)
 	debFile, _ := os.Create(debFileName)
 	defer debFile.Close()
+	log.Printf("GOAL: %s", debFileName)
 
+	// The debFile is an AR file.
+	arBuffer := new(bytes.Buffer)
+	arWriter := ar.NewWriter(arBuffer)
+	err := arWriter.WriteGlobalHeader();
+	if err != nil {
+		log.Fatalf("Failed to write %s header: %v", debFileName, err)
+	}
+
+	// The DataFileTarGz is a TAR file
 	tarBuffer := new(bytes.Buffer)
 	gzBuffer := gzip.NewWriter(tarBuffer)
 	tarWriter := tar.NewWriter(gzBuffer)
