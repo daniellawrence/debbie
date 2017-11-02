@@ -74,8 +74,8 @@ func createDeb(metadata PackageMetaData) {
 	log.Printf("GOAL: %s", debFileName)
 
 	// The debFile is an AR file.
-	arBuffer := new(bytes.Buffer)
-	arWriter := ar.NewWriter(arBuffer)
+	// arBuffer := new(bytes.Buffer)
+	arWriter := ar.NewWriter(debFile)
 	err := arWriter.WriteGlobalHeader();
 	if err != nil {
 		log.Fatalf("Failed to write %s header: %v", debFileName, err)
