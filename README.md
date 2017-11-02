@@ -15,12 +15,14 @@ Goals
 How to package
 -----------------
 
-The following command should create a package with a single file.
+This is the script to turn this into a deb package
 
-    $ mkdir -p /tmp/data/example/
-	$ date > /tmp/data/example/date.text
-	$ debbie -name example -path /tmp/data
-	example_0.0.1-1.deb
+	#!/bin/bash
+	go build main.go
+	mkdir -p build
+	mv main build/debbie
+	./build/debbie -name debbie -path ./build
+	dpkg-deb --info /tmp/debbie*deb
 	
 It should be installable via dpkg
 

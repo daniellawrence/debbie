@@ -45,9 +45,9 @@ Version: {{.Version}}-1
 Section: devel
 Priority: optional
 Architecture: all
-Install-Size: {.InstallSize}}
+Install-Size: {{.InstallSize}}
 Maintainer: {{.Maintainer}} <{{.MaintainerEmail}}>
-Description: Built with debbie
+Description: Built with debbie, http://github.com/daniellawrence/debbie
 `
 
 const changelogTemplateText = `{{.Name}} ({{.Version}}-1) unstable; urgent=medium
@@ -71,7 +71,6 @@ func createDeb(metadata PackageMetaData) {
 	debFileName := fmt.Sprintf("/tmp/%s_%s_all.deb", metadata.Name, metadata.Version)
 	debFile, _ := os.Create(debFileName)
 	defer debFile.Close()
-	log.Printf("GOAL: %s", debFileName)
 
 	// The debFile is an AR file.
 	// arBuffer := new(bytes.Buffer)
