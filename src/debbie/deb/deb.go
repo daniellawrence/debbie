@@ -1,46 +1,21 @@
-package main
+package deb
 
 import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"crypto/md5"
-	"flag"
 	"fmt"
 	"log"
 	"text/template"
 	"path/filepath"
-	"path"
 	"os"
 	"time"
-	"io/ioutil"
-	"strings"
+	//
+	"debbie/common"
 	//
 	"github.com/blakesmith/ar"
 )
 
-type PackageMetaData struct {
-	Name            string
-	DebFile         string
-	SourcePath      string
-	SourcePathBase  string
-	InstallPath     string
-	OutputDir       string
-	Version         string
-	Maintainer      string
-	MaintainerEmail string
-	InstallSize     int64
-	Time            time.Time
-}
-
-type TarFiles struct {
-	Name    string
-	Mode    uint32
-	Size    int64
-	Type    byte
-	Content bytes.Buffer
-	Md5Sum  []byte
-}
 
 const controlTemplateText = `
 Package: {{.Name}}
@@ -63,16 +38,7 @@ const changelogTemplateText = `{{.Name}} ({{.Version}}-1) unstable; urgent=mediu
 const compatTemplateText = `10
 `
 
-var strPackageName = flag.String("name", "", "name of package")
-var strPath = flag.String("path", "", "path to sources files")
-var strInstallPath = flag.String("install-path", "", "installPath (eg. /usr/local/<name>)")
-var strOutputDir = flag.String("output-dir", "/tmp/", "directory where the .deb file will be written")
-var strVersion = flag.String("version", "0.0.1", "version of page")
-var strMaintainer = flag.String("maintainer", "Dainel Lawrence", "maintainer")
-var strMaintainerEmail = flag.String("maintainer-email", "dannyla@linux.com", "maintainer email")
-
-
-func createDeb(metadata PackageMetaData) string {
+func CreateDeb(metadata common.PackageMetaData, dataFiles []common.TarFiles) string {
 	debFileName := fmt.Sprintf("%s_%s_all.deb", metadata.Name, metadata.Version)
 	debFilePath := filepath.Join(metadata.OutputDir, debFileName)
 	debFile, _ := os.Create(debFilePath)
@@ -93,13 +59,9 @@ func createDeb(metadata PackageMetaData) string {
 
 	// find all data files
 	var totalSize int64;
-	var ignoreDirs = []string{".bzr", ".hg", ".git"}
-	var DataFiles = []TarFiles{}
 	var md5sums = new(bytes.Buffer)
 
-	filepath.Walk(metadata.SourcePath, populateDataFiles(ignoreDirs, &DataFiles, metadata))
-
-	for _, file := range DataFiles {
+	for _, file := range dataFiles {
 
 		if uint32(file.Type) != uint32(tar.TypeReg) {
 			continue
@@ -199,7 +161,7 @@ func createDeb(metadata PackageMetaData) string {
 }
 
 
-func createControl(metadata PackageMetaData, md5sums []byte) (controllTarGz []byte, err error) {
+func createControl(metadata common.PackageMetaData, md5sums []byte) (controllTarGz []byte, err error) {
 	tarBuffer := new(bytes.Buffer)
 	gzBuffer := gzip.NewWriter(tarBuffer)
 	tarWriter := tar.NewWriter(gzBuffer)
@@ -256,61 +218,4 @@ func createControl(metadata PackageMetaData, md5sums []byte) (controllTarGz []by
 	}
 
 	return tarBuffer.Bytes(), nil
-}
-
-func main() {
-	flag.Parse()
-
-	sourcePathAbs, _ := filepath.Abs(*strPath)
-	sourcePathBase := path.Base(sourcePathAbs)
-
-	metadata := PackageMetaData{
-		Name: *strPackageName,
-		SourcePath: sourcePathAbs,
-		SourcePathBase: sourcePathBase,
-		InstallPath: *strInstallPath,
-		OutputDir: *strOutputDir,
-		Version: *strVersion,
-		Maintainer: *strMaintainer,
-		MaintainerEmail: *strMaintainerEmail,
-		Time: time.Now()}
-
-	if *strPackageName == "" {
-		metadata.Name = sourcePathBase
-	}
-
-	outputFile := createDeb(metadata)
-	log.Printf("Created file: %s\n", outputFile)
-}
-
-
-func populateDataFiles(ignoreDirs []string, dataFiles *[]TarFiles, metadata PackageMetaData) filepath.WalkFunc {
-	return func(path string, info os.FileInfo, err error) error {
-		// sourcePathLength := len(metadata.SourcePath)
-		relPath := strings.TrimPrefix(path, metadata.SourcePath)
-		targetPath := filepath.Join(metadata.InstallPath, relPath)		
-		
-		if err != nil {
-			log.Print(err)
-			return nil
-		}
-		var fileType = tar.TypeReg
-		if info.IsDir() {
-			fileType = tar.TypeDir
-			dir := filepath.Base(path)
-			for _, d := range ignoreDirs {
-				if d == dir {
-					return filepath.SkipDir
-				}
-			}
-		}
-		mode := uint32(info.Mode())
-		size := info.Size()
-		fileContent, err := ioutil.ReadFile(path)
-		fileBuffer := bytes.NewBuffer(fileContent)
-		md5Sum := md5.New().Sum(fileContent)
-
-		*dataFiles = append(*dataFiles, TarFiles{targetPath, mode, size, byte(fileType), *fileBuffer, md5Sum})
-		return nil
-    }
 }
