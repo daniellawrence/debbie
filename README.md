@@ -3,7 +3,7 @@
 debbie
 --------
 
-Create a .deb package for debian from a path.
+The easiest way to create a .deb package for debian from a directory.
 
 Goals
 ------
@@ -68,7 +68,7 @@ No shells
 
 No Temp files
 	 
-*Learn*
+*Learning go + deb*
 
 Its getting better
 	 
@@ -113,3 +113,8 @@ TODO / Ideas
 * Validate .deb packages are as good as they can be
 * More deb package options
 * Investigate rpm
+
+GOPATH?
+-------
+
+    export GOPATH=$PWD:$PWD/vendor

@@ -19,6 +19,7 @@ type PackageMetaData struct {
 	MaintainerEmail string
 	InstallSize     int64
 	Time            time.Time
+	PackageType     string
 }
 
 

@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	"flag"
 	"log"
+	"fmt"
 	"path/filepath"
 	"path"
 	"os"
@@ -25,10 +26,20 @@ var strOutputDir = flag.String("output-dir", "/tmp/", "directory where the .deb 
 var strVersion = flag.String("version", "0.0.1", "version of page")
 var strMaintainer = flag.String("maintainer", "Dainel Lawrence", "maintainer")
 var strMaintainerEmail = flag.String("maintainer-email", "dannyla@linux.com", "maintainer email")
-
+var strPackageType = flag.String("package-type", "deb", "type package to create (only 'deb' for now)")
 
 func main() {
+	var ignoreDirs = []string{".bzr", ".hg", ".git"}
+	var dataFiles = []common.TarFiles{}
+	var outputFile string
+
 	flag.Parse()
+	
+	if *strPackageName == "" || *strPath == "" {
+		fmt.Printf("missing a required info, -name\n")
+		fmt.Printf("missing a required info, -path\n")
+		os.Exit(1)
+	}
 
 	sourcePathAbs, _ := filepath.Abs(*strPath)
 	sourcePathBase := path.Base(sourcePathAbs)
@@ -42,18 +53,18 @@ func main() {
 		Version: *strVersion,
 		Maintainer: *strMaintainer,
 		MaintainerEmail: *strMaintainerEmail,
+		PackageType: *strPackageType,
 		Time: time.Now()}
-
-	if *strPackageName == "" {
-		metadata.Name = sourcePathBase
-	}
-
-	var ignoreDirs = []string{".bzr", ".hg", ".git"}
-	var dataFiles = []common.TarFiles{}
-
+	
 	filepath.Walk(metadata.SourcePath, populateDataFiles(ignoreDirs, &dataFiles, metadata))
 
-	outputFile := deb.CreateDeb(metadata, dataFiles)
+	if *strPackageType == "deb" {
+		outputFile = deb.CreateDeb(metadata, dataFiles)
+	} else {
+		fmt.Printf("package-type '%s' is invalid, must be 'deb'\n", *strPackageType)
+		os.Exit(2)
+	}
+
 	log.Printf("Created file: %s\n", outputFile)
 }
 

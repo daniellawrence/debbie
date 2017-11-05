@@ -10,7 +10,7 @@ mv debbie build/usr/local/bin/
 mv /tmp/debbie_0.0.1_all.deb output/
 
 # clean-up files
-rm build/usr/local/bin/debbie
+mv build/usr/local/bin/debbie output/
 rmdir build/usr/local/bin
 rmdir build/usr/local/
 rmdir build/usr/
