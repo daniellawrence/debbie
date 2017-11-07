@@ -72,7 +72,7 @@ func CreateDeb(metadata common.PackageMetaData, dataFiles []common.TarFiles) str
 			Name:     file.Name,
 			Size:     file.Size,
 			ModTime:  time.Now(),
-			Mode:     0644,
+			Mode:     int64(file.Mode),
 			Typeflag: file.Type,
 		}
 		md5sums.WriteString(fmt.Sprintf("%s  %s", file.Md5Sum, file.Name))
