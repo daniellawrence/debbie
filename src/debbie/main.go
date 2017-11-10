@@ -79,9 +79,22 @@ func populateDataFiles(ignoreDirs []string, dataFiles *[]common.TarFiles, metada
 			log.Print(err)
 			return nil
 		}
+
 		var fileType = tar.TypeReg
-		if info.IsDir() {
+
+		switch mode := info.Mode(); {			
+		case mode.IsRegular():
+			fileType = tar.TypeReg
+		case mode.IsDir():
 			fileType = tar.TypeDir
+		case mode&os.ModeSymlink != 0:
+			fileType = tar.TypeSymlink
+		default:
+			log.Printf("WARN: skipping source '%s': unknown file type", path)
+			return filepath.SkipDir
+		}
+
+		if info.IsDir() {
 			dir := filepath.Base(path)
 			for _, d := range ignoreDirs {
 				if d == dir {

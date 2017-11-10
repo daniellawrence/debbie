@@ -6,7 +6,7 @@ go build debbie
 # setup dirs for package
 mkdir -p build/usr/local/bin/
 mv debbie build/usr/local/bin/
-./build/usr/local/bin/debbie -name debbie -path ./build -output-dir ./output
+./build/usr/local/bin/debbie -name debbie -version 0.0.2 -path ./build -output-dir ./output
 
 # clean-up files
 rm    build/usr/local/bin/debbie

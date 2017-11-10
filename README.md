@@ -118,3 +118,9 @@ GOPATH?
 -------
 
     export GOPATH=$PWD:$PWD/vendor
+
+
+Projects using this
+------------------------
+
+* 

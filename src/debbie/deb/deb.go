@@ -79,12 +79,14 @@ func CreateDeb(metadata common.PackageMetaData, dataFiles []common.TarFiles) str
 
 		err := tarWriter.WriteHeader(&hdr)
 		if err != nil {
-			log.Fatalf("Writing datafile.tar.gz Header error: %v", err)
+			log.Fatalf("Writing '%s' into datafile.tar.gz Header error: %v",
+				file.Name, err)
 		}
 
 		_, err = tarWriter.Write(file.Content.Bytes())
 		if err != nil {
-			log.Fatalf("Writing datafile.tar.gz Content error: %v", err)
+			log.Fatalf("Writing '%s' into datafile.tar.gz Content error: %v",
+				file.Name, err)
 		}
 	}
 
