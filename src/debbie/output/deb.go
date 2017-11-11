@@ -1,4 +1,4 @@
-package deb
+package output
 
 import (
 	"archive/tar"
@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"os"
 	"time"
-	"runtime/debug"
 	//
 	"debbie/common"
 	//
@@ -36,8 +35,6 @@ const changelogTemplateText = `{{.Name}} ({{.Version}}-1) unstable; urgent=mediu
 -- {{.Maintainer}} <{{.MaintainerEmail}}> Mon, 22 Mar 2010 00:37:31 +0100
 `
 
-const compatTemplateText = `10
-`
 
 func CreateDeb(metadata common.PackageMetaData, dataFiles []common.TarFile) string {
 	debFileName := fmt.Sprintf("%s_%s_all.deb", metadata.Name, metadata.Version)

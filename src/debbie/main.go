@@ -15,7 +15,7 @@ import (
 	"time"
 	//
 	"debbie/common"
-	"debbie/deb"
+	"debbie/output"
 )
 
 var strPackageName = flag.String("name", "", "name of package")
@@ -58,7 +58,7 @@ func main() {
 	filepath.Walk(metadata.SourcePath, populateDataFiles(ignoreDirs, &dataFiles, metadata))
 
 	if *strPackageType == "deb" {
-		outputFile = deb.CreateDeb(metadata, dataFiles)
+		outputFile = output.CreateDeb(metadata, dataFiles)
 	} else {
 		fmt.Printf("package-type '%s' is invalid, must be 'deb'\n", *strPackageType)
 		os.Exit(2)
