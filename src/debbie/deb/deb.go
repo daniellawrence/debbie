@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"os"
 	"time"
+	"runtime/debug"
 	//
 	"debbie/common"
 	//
@@ -38,7 +39,7 @@ const changelogTemplateText = `{{.Name}} ({{.Version}}-1) unstable; urgent=mediu
 const compatTemplateText = `10
 `
 
-func CreateDeb(metadata common.PackageMetaData, dataFiles []common.TarFiles) string {
+func CreateDeb(metadata common.PackageMetaData, dataFiles []common.TarFile) string {
 	debFileName := fmt.Sprintf("%s_%s_all.deb", metadata.Name, metadata.Version)
 	debFilePath := filepath.Join(metadata.OutputDir, debFileName)
 	debFile, _ := os.Create(debFilePath)
@@ -58,35 +59,30 @@ func CreateDeb(metadata common.PackageMetaData, dataFiles []common.TarFiles) str
 	tarWriter := tar.NewWriter(gzBuffer)
 
 	// find all data files
-	var totalSize int64;
+	var totalSize int64
 	var md5sums = new(bytes.Buffer)
 
 	for _, file := range dataFiles {
+		totalSize += file.Info.Size()
 
-		if uint32(file.Type) != uint32(tar.TypeReg) {
+		hdr := file.TarHeader
+		log.Printf("%s %o %s\n", hdr.Name, hdr.Mode, hdr.Linkname)
+
+		md5sums.WriteString(fmt.Sprintf("%s  %s", file.Md5Sum, file.Name))
+		
+		err := tarWriter.WriteHeader(hdr)
+		if err != nil {
+			debug.PrintStack()
+			log.Fatalf("Writing '%s' into datafile.tar.gz Header error: %v", file.Name, err)
+		}
+
+		if hdr.Typeflag != tar.TypeReg {
 			continue
 		}
-
-		totalSize += file.Size
-		hdr := tar.Header{
-			Name:     file.Name,
-			Size:     file.Size,
-			ModTime:  time.Now(),
-			Mode:     int64(file.Mode),
-			Typeflag: file.Type,
-		}
-		md5sums.WriteString(fmt.Sprintf("%s  %s", file.Md5Sum, file.Name))
-
-		err := tarWriter.WriteHeader(&hdr)
-		if err != nil {
-			log.Fatalf("Writing '%s' into datafile.tar.gz Header error: %v",
-				file.Name, err)
-		}
-
+		
 		_, err = tarWriter.Write(file.Content.Bytes())
 		if err != nil {
-			log.Fatalf("Writing '%s' into datafile.tar.gz Content error: %v",
-				file.Name, err)
+			log.Fatalf("Writing '%s' into datafile.tar.gz Content error: %v", file.Name, err)
 		}
 	}
 
