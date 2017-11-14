@@ -69,7 +69,6 @@ func CreateDeb(metadata common.PackageMetaData, dataFiles []common.TarFile) stri
 		
 		err := tarWriter.WriteHeader(hdr)
 		if err != nil {
-			debug.PrintStack()
 			log.Fatalf("Writing '%s' into datafile.tar.gz Header error: %v", file.Name, err)
 		}
 
