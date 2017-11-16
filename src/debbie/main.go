@@ -63,6 +63,8 @@ func main() {
 
 	if *strPackageType == "deb" {
 		outputFile = output.CreateDeb(metadata, dataFiles)
+	} else if *strPackageType == "rpm" {
+		outputFile = output.CreateRpm(metadata, dataFiles)
 	} else {
 		fmt.Printf("package-type '%s' is invalid, must be 'deb'\n", *strPackageType)
 		os.Exit(2)

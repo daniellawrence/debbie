@@ -12,7 +12,8 @@ if [ -e build/usr/local/bin/d ];then
 fi
 (cd build/usr/local/bin/; ln -s debbie d)
 
-./build/usr/local/bin/debbie -name debbie -version 0.0.2 -path ./build -output-dir ./output
+./build/usr/local/bin/debbie -name debbie -version 0.0.2 -path ./build -package-type deb -output-dir ./output
+./build/usr/local/bin/debbie -name debbie -version 0.0.2 -path ./build -package-type rpm -output-dir ./output
 
 ls -l build/usr/local/bin
 # clean-up files
